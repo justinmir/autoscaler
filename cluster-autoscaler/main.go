@@ -35,6 +35,7 @@ import (
 	"k8s.io/autoscaler/cluster-autoscaler/provisioningrequest/besteffortatomic"
 	"k8s.io/autoscaler/cluster-autoscaler/provisioningrequest/checkcapacity"
 	"k8s.io/autoscaler/cluster-autoscaler/provisioningrequest/provreqclient"
+	simulatormetrics "k8s.io/autoscaler/cluster-autoscaler/simulator/metrics"
 	"k8s.io/autoscaler/cluster-autoscaler/simulator/predicatechecker"
 	"k8s.io/autoscaler/cluster-autoscaler/simulator/scheduling"
 	kubelet_config "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -271,6 +272,7 @@ var (
 	asyncNodeGroupsEnabled      = flag.Bool("async-node-groups", false, "Whether clusterautoscaler creates and deletes node groups asynchronously. Experimental: requires cloud provider supporting async node group operations, enable at your own risk.")
 	proactiveScaleupEnabled     = flag.Bool("enable-proactive-scaleup", false, "Whether to enable/disable proactive scale-ups, defaults to false")
 	podInjectionLimit           = flag.Int("pod-injection-limit", 5000, "Limits total number of pods while injecting fake pods. If unschedulable pods already exceeds the limit, pod injection is disabled but pods are not truncated.")
+	perPodBlockingMetrics       = flag.Bool("per-pod-blocking-metrics", false, "Whether we should export per pod (high cardinality) metrics.")
 )
 
 func isFlagPassed(name string) bool {
@@ -610,6 +612,7 @@ func buildAutoscaler(debuggingSnapshotter debuggingsnapshot.DebuggingSnapshotter
 
 func run(healthCheck *metrics.HealthCheck, debuggingSnapshotter debuggingsnapshot.DebuggingSnapshotter) {
 	metrics.RegisterAll(*emitPerNodeGroupMetrics)
+	simulatormetrics.RegisterAll(*perPodBlockingMetrics)
 
 	autoscaler, err := buildAutoscaler(debuggingSnapshotter)
 	if err != nil {

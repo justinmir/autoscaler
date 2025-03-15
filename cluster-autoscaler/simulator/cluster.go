@@ -23,6 +23,7 @@ import (
 	"k8s.io/autoscaler/cluster-autoscaler/core/scaledown/pdb"
 	"k8s.io/autoscaler/cluster-autoscaler/simulator/clustersnapshot"
 	"k8s.io/autoscaler/cluster-autoscaler/simulator/drainability/rules"
+	"k8s.io/autoscaler/cluster-autoscaler/simulator/metrics"
 	"k8s.io/autoscaler/cluster-autoscaler/simulator/options"
 	"k8s.io/autoscaler/cluster-autoscaler/simulator/predicatechecker"
 	"k8s.io/autoscaler/cluster-autoscaler/simulator/scheduling"
@@ -156,9 +157,18 @@ func (r *RemovalSimulator) SimulateNodeRemoval(
 	klog.V(2).Infof("Simulating node %s removal", nodeName)
 
 	podsToRemove, daemonSetPods, blockingPod, err := GetPodsToMove(nodeInfo, r.deleteOptions, r.drainabilityRules, r.listers, remainingPdbTracker, timestamp)
+
+	for _, p := range nodeInfo.Pods {
+		if blockingPod != nil && (p.Pod.Name != blockingPod.Pod.Name || p.Pod.Namespace != blockingPod.Pod.Namespace) {
+			klog.V(2).Info("Clearing blocking reason for pod %s/%s", p.Pod.Namespace, p.Pod.Name)
+			metrics.ClearPodBlockingReason(p.Pod.Namespace, p.Pod.Name)
+		}
+	}
+
 	if err != nil {
 		klog.V(2).Infof("node %s cannot be removed: %v", nodeName, err)
 		if blockingPod != nil {
+			metrics.SetPodBlockingReason(blockingPod.Pod.Namespace, blockingPod.Pod.Name, blockingPod.Reason.String())
 			return nil, &UnremovableNode{Node: nodeInfo.Node(), Reason: BlockedByPod, BlockingPod: blockingPod}
 		}
 		return nil, &UnremovableNode{Node: nodeInfo.Node(), Reason: UnexpectedError}
